@@ -20,4 +20,4 @@ ENV TESSERACT_CMD=/usr/bin/tesseract
 
 EXPOSE 10000
 
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-10000} --timeout 120 app:app"]
+CMD ["sh", "-c", "gunicorn --workers 1 --threads 1 --timeout 180 --bind 0.0.0.0:${PORT:-10000} app:app"]
