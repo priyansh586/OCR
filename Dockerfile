@@ -1,6 +1,5 @@
 FROM python:3.11-slim
 
-# Install Tesseract OCR and required system libraries
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     tesseract-ocr \
@@ -17,7 +16,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app.py .
 
 ENV PYTHONUNBUFFERED=1
+ENV TESSERACT_CMD=/usr/bin/tesseract
 
 EXPOSE 10000
 
-CMD ["gunicorn", "--bind", "0.0.0.0:10000", "app:app"]
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-10000} --timeout 120 app:app"]
