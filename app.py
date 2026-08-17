@@ -1,40 +1,3 @@
-"""
-Aadhaar OCR Extraction API — single-file Flask app.
-
-Run locally:
-    pip install flask opencv-python-headless pytesseract pillow numpy
-    python app.py
-
-Then POST an image to /extract:
-    curl -X POST -F "file=@document.jpg" http://localhost:5000/extract
-
-Or send base64 JSON:
-    curl -X POST http://localhost:5000/extract \
-         -H "Content-Type: application/json" \
-         -d '{"image_base64": "<base64 string>"}'
-
-Response (JSON):
-    {
-        "success": true,
-        "data": {
-            "name": "...",
-            "dob": "...",
-            "gender": "...",
-            "aadhaar_number": "...",
-            "address": "...",
-            "pincode": "..."
-        }
-    }
-
-Deploy notes:
-    - Tesseract binary must be installed on the host (apt-get install
-      tesseract-ocr on Debian/Ubuntu). Set TESSERACT_CMD env var if it's
-      not on PATH.
-    - For production, run behind gunicorn:
-          gunicorn -w 2 -b 0.0.0.0:8080 app:app
-    - Works as-is on Render/Railway/Fly.io/EC2 etc. as long as the
-      tesseract-ocr system package is installed in the build step.
-"""
 
 import os
 import re
@@ -47,11 +10,6 @@ import numpy as np
 import pytesseract
 from flask import Flask, request, jsonify
 
-
-# =========================================================
-# 1. CONFIG
-# =========================================================
-
 TESSERACT_CMD = os.environ.get("TESSERACT_CMD")  # e.g. C:\...\tesseract.exe
 if TESSERACT_CMD:
     pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD
@@ -61,11 +19,6 @@ MAX_UPLOAD_MB = 10
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
-
-
-# =========================================================
-# 2. IMAGE PREPROCESSING
-# =========================================================
 
 def decode_image(file_bytes):
     arr = np.frombuffer(file_bytes, dtype=np.uint8)
@@ -105,10 +58,6 @@ def create_variants(image):
     return {"denoised": denoised, "otsu": otsu, "adaptive": adaptive, "clahe": enhanced}
 
 
-# =========================================================
-# 3. OCR
-# =========================================================
-
 def run_ocr(variants):
     results = {}
     for name, img in variants.items():
@@ -138,11 +87,6 @@ def dedupe_lines(lines):
             seen.add(key)
             out.append(line)
     return out
-
-
-# =========================================================
-# 4. FIELD PATTERNS
-# =========================================================
 
 DOB_RE = re.compile(
     r"(?:DOB|D\.O\.B|Date\s*of\s*Birth)[^0-9]{0,10}(\d{1,2}[/-]\d{1,2}[/-]\d{4})",
@@ -318,11 +262,6 @@ def find_address(lines):
     address = clean_address_text(address)
     return address or None
 
-
-# =========================================================
-# 5. PIPELINE
-# =========================================================
-
 def extract_fields(lines, full_text):
     return {
         "name": find_name(lines),
@@ -369,11 +308,6 @@ def process_image_bytes(file_bytes):
 
     return final
 
-
-# =========================================================
-# 6. ROUTES
-# =========================================================
-
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok"})
@@ -387,8 +321,10 @@ def extract():
 
         elif request.is_json and "image_base64" in (request.get_json() or {}):
             b64 = request.get_json()["image_base64"]
+
             if "," in b64 and b64.strip().startswith("data:"):
-                b64 = b64.split(",", 1)[1]  # strip data URL prefix if present
+                b64 = b64.split(",", 1)[1]
+
             file_bytes = base64.b64decode(b64)
 
         else:
@@ -398,26 +334,36 @@ def extract():
             }), 400
 
         if not file_bytes:
-            return jsonify({"success": False, "error": "Empty image payload."}), 400
+            return jsonify({
+                "success": False,
+                "error": "Empty image payload."
+            }), 400
 
         result = process_image_bytes(file_bytes)
-        return jsonify({"success": True, "data": result})
+
+        return jsonify({
+            "success": True,
+            "data": result
+        })
 
     except ValueError as e:
-        return jsonify({"success": False, "error": str(e)}), 422
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 422
 
     except Exception as e:
-    traceback.print_exc()
-    return jsonify({
-        "success": False,
-        "error": str(e)
-    }), 500
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
 
-
-# =========================================================
-# 7. ENTRY POINT
-# =========================================================
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(
+        host="0.0.0.0",
+        port=port,
+        debug=False
+    )
