@@ -14,6 +14,9 @@ TESSERACT_CMD = os.environ.get("TESSERACT_CMD")  # e.g. C:\...\tesseract.exe
 if TESSERACT_CMD:
     pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD
 
+    print("Tesseract path:", pytesseract.pytesseract.tesseract_cmd)
+    print("Tesseract version:", pytesseract.get_tesseract_version())
+
 INCLUDE_NULLS = False
 MAX_UPLOAD_MB = 10
 
