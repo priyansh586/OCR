@@ -406,9 +406,12 @@ def extract():
     except ValueError as e:
         return jsonify({"success": False, "error": str(e)}), 422
 
-    except Exception:
-        traceback.print_exc()
-        return jsonify({"success": False, "error": "Internal processing error."}), 500
+    except Exception as e:
+    traceback.print_exc()
+    return jsonify({
+        "success": False,
+        "error": str(e)
+    }), 500
 
 
 # =========================================================
