@@ -33,57 +33,40 @@ def decode_image(file_bytes):
 
 def create_variants(image):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
     h, w = gray.shape
 
-    # Keep image size under control
-    max_width = 1600
+    if w < 600:
+        scale = 4
+    elif w < 1200:
+        scale = 3
+    elif w < 2000:
+        scale = 2
+    else:
+        scale = 1
 
-    if w > max_width:
-        scale = max_width / w
-        gray = cv2.resize(
-            gray,
-            None,
-            fx=scale,
-            fy=scale,
-            interpolation=cv2.INTER_AREA
-        )
+    if scale > 1:
+        gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
 
-    # One lightweight preprocessing pipeline
-    denoised = cv2.fastNlMeansDenoising(gray, h=8)
+    denoised = cv2.fastNlMeansDenoising(gray, h=10)
 
-    otsu = cv2.threshold(
-        denoised,
-        0,
-        255,
-        cv2.THRESH_BINARY + cv2.THRESH_OTSU
-    )[1]
+    otsu = cv2.threshold(denoised, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
 
-    # Only use 2 variants instead of 4
-    return {
-        "denoised": denoised,
-        "otsu": otsu
-    }
+    adaptive = cv2.adaptiveThreshold(
+        denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 11
+    )
+
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    enhanced = clahe.apply(denoised)
+
+    return {"denoised": denoised, "otsu": otsu, "adaptive": adaptive, "clahe": enhanced}
 
 
 def run_ocr(variants):
     results = {}
-
     for name, img in variants.items():
-        try:
-            text = pytesseract.image_to_string(
-                img,
-                config="--psm 6",
-                lang="eng"
-            )
-
-            if text.strip():
-                results[name] = text
-
-        finally:
-            # Release OpenCV image memory
-            del img
-
+        text = pytesseract.image_to_string(img, config="--psm 6", lang="eng")
+        if text.strip():
+            results[name] = text
     return results
 
 
